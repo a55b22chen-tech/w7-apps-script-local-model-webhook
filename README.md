@@ -1,10 +1,10 @@
 # W7：Apps Script Webhook + 本地模型轉接站
 
-依照老師 W7 互動頁的介面整理：LINE webhook 留在 Apps Script；「查 …／搜尋 …」送到電腦上的 Ollama 本地模型，由模型自行決定何時搜尋並回傳來源；若 Ollama 搜尋功能未登入或沒有結果，轉接站改用公開維基百科 API 找來源，再交給本地模型整理。其他文字、照片維持待辦小秘書流程。
+依照老師 W7 的路徑整理：LINE webhook 留在 Apps Script；「查 …／搜尋 …」送到電腦上的 Ollama 本地模型，由模型自行決定何時搜尋並回傳來源；若 Ollama 搜尋功能未登入或沒有結果，轉接站改用公開維基百科 API 找來源，再交給本地模型整理。這份可獨立執行的 `Code.gs` 將其他文字記成試算表待辦。因目前找不到原 W5 Apps Script 程式，這份範例保留文字待辦流程，不包含原 W5 的照片／日曆功能。
 
 ## 檔案
 
-- `Code.gs`：W7 Apps Script 對照程式，金鑰與轉接網址從指令碼屬性讀取。
+- `Code.gs`：獨立 W7 webhook 範例，金鑰與轉接網址從指令碼屬性讀取。
 - `line-search-relay.mjs`：老師提供的 Node.js 轉接站，使用本機 Ollama web search/fetch，並可啟動 Cloudflare quick tunnel。
 - `課堂示範流程.md`：上課展示順序。
 
@@ -24,16 +24,16 @@
 
 ## Apps Script 設定
 
-1. 將 `Code.gs` 的 W7 對照程式放入 Apps Script 專案。若要接續自己的 W5 專案，先依老師課程頁對照差異，只把查詢分流與 `askLocalSearch` 加進原程式，保留原有待辦、照片等函式。
-2. 在 Apps Script「專案設定 → 指令碼屬性」設定 `SEARCH_RELAY_URL`（轉接站印出的臨時 HTTPS 網址）與 `SEARCH_RELAY_KEY`（從剪貼簿貼上）。程式不需重新部署即可更新這兩個屬性；通道重開換網址時更新 URL。
-3. LINE token、Gemini key 與試算表 ID 依原專案既有設定存於指令碼屬性。將已部署 Web App 的 webhook URL 設在 LINE Developers；部署 URL 不放 repo 或截圖。
+1. 將 `Code.gs` 放入 Apps Script 專案並部署成 Web App，執行身分選自己、存取權設為 LINE webhook 能呼叫的選項。若找到原 W5 專案，依老師課程頁將 `askLocalSearch_` 與查詢分流併入 W5，保留原有待辦和照片函式。
+2. 在 Apps Script「專案設定 → 指令碼屬性」設定 `LINE_CHANNEL_ACCESS_TOKEN`、`SEARCH_RELAY_URL`（轉接站印出的臨時 HTTPS 網址）與 `SEARCH_RELAY_KEY`（轉接站建立的密碼）。可選填 `SPREADSHEET_ID`；不填時第一次記待辦會自動建立試算表並記住 ID。
+3. 將部署後的 Web App 網址填入 LINE Developers 的 Webhook URL 並啟用 webhook；`/exec` 網址不要放 repo 或截圖。
 4. LINE 傳 `查 2026 年諾貝爾物理獎得主是誰？`，確認手機回答含來源；relay 視窗會印出收到一題與處理狀態。一般文字照舊進待辦流程。
 
 ## 我改了什麼
 
 - 使用老師指定的 `SEARCH_RELAY_URL`／`SEARCH_RELAY_KEY` 及 `x-relay-key` API，不把密碼放網址或程式碼。
-- `Code.gs` 的查詢分支限定「查／搜尋」後接空白或冒號，呼叫本機 relay；成功回覆答案與來源，失敗時明確回報電腦連線問題，不把查詢寫成待辦。
-- 其他訊息交回原待辦小秘書流程；示範版亦保留照片、Drive 與日曆相關函式。
+- `Code.gs` 的查詢分支限定「查／搜尋」後接空白或冒號，呼叫本機 relay；成功回覆答案與來源，失敗時明確回報，不把查詢寫成待辦。
+- 其他文字直接記入試算表待辦；這是獨立範例，待找到 W5 原始程式後應把查詢分支合併回原程式，以保留照片與日曆功能。
 - 轉接站優先使用本機 Ollama 模型的網路搜尋工具；Ollama 未登入或無搜尋結果時，改以維基百科 API 搜尋。來源 URL 由實際結果產生，回答仍由本機模型完成。
 
 ## 安全
