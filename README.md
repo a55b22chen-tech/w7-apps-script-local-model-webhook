@@ -1,6 +1,6 @@
 # W7：Apps Script Webhook + 本地模型轉接站
 
-依照老師 W7 互動頁的介面整理：LINE webhook 留在 Apps Script；「查 …／搜尋 …」送到電腦上的 Ollama 本地模型，由模型自行決定何時使用網路搜尋並回傳來源；其他文字、照片維持待辦小秘書流程。
+依照老師 W7 互動頁的介面整理：LINE webhook 留在 Apps Script；「查 …／搜尋 …」送到電腦上的 Ollama 本地模型，由模型自行決定何時搜尋並回傳來源；若 Ollama 搜尋功能未登入或沒有結果，轉接站改用公開維基百科 API 找來源，再交給本地模型整理。其他文字、照片維持待辦小秘書流程。
 
 ## 檔案
 
@@ -20,7 +20,7 @@
    ```
 
 3. 等轉接站載入模型並印出 Cloudflare 網址。轉接密碼由程式放在使用者家目錄的 `.line-search-relay.key`，不會印在視窗；程式會將密碼複製到剪貼簿。保持此視窗開啟。
-4. 單機檢查可用 `node line-search-relay.mjs --no-tunnel`；健康檢查路徑為 `/health`。對 Apps Script 的 API 是 `POST /ask`，密碼標頭為 `x-relay-key`。另有 `/check-key` 供 Apps Script `testSetup` 驗證密碼。
+4. 單機檢查可用 `node line-search-relay.mjs --no-tunnel`；健康檢查路徑為 `/health`。對 Apps Script 的 API 是 `POST /ask`，密碼標頭為 `x-relay-key`。另有 `/check-key` 供 Apps Script `testSetup` 驗證密碼。Ollama 搜尋無法使用時會自動改用維基百科 API。
 
 ## Apps Script 設定
 
@@ -34,7 +34,7 @@
 - 使用老師指定的 `SEARCH_RELAY_URL`／`SEARCH_RELAY_KEY` 及 `x-relay-key` API，不把密碼放網址或程式碼。
 - `Code.gs` 的查詢分支限定「查／搜尋」後接空白或冒號，呼叫本機 relay；成功回覆答案與來源，失敗時明確回報電腦連線問題，不把查詢寫成待辦。
 - 其他訊息交回原待辦小秘書流程；示範版亦保留照片、Drive 與日曆相關函式。
-- 轉接站使用本機 Ollama 模型與其網路搜尋工具，來源 URL 由實際搜尋結果產生。
+- 轉接站優先使用本機 Ollama 模型的網路搜尋工具；Ollama 未登入或無搜尋結果時，改以維基百科 API 搜尋。來源 URL 由實際結果產生，回答仍由本機模型完成。
 
 ## 安全
 

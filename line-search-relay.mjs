@@ -73,8 +73,45 @@ async function ollama(path, body, signal) {
 
 // 搜尋結果的內文可能很長，截短再給模型，免得塞爆它的記憶（num_ctx）
 async function webSearch(query, signal, sources) {
-  const data = await ollama("/api/experimental/web_search", { query, max_results: 3 }, signal);
-  const rows = (data.results || []).map(r => ({ title: r.title, url: r.url, content: String(r.content || "").slice(0, 1500) }));
+  try {
+    const data = await ollama("/api/experimental/web_search", { query, max_results: 3 }, signal);
+    const rows = (data.results || []).map(r => ({ title: r.title, url: r.url, content: String(r.content || "").slice(0, 1500) }));
+    if (rows.length) {
+      rows.forEach(r => sources.push({ title: r.title, url: r.url }));
+      return JSON.stringify(rows);
+    }
+  } catch (err) {
+    if (signal.aborted) throw err;
+    log(`⚠️ Ollama 網路搜尋不可用，改用維基百科搜尋：${err.message}`);
+  }
+  // No Ollama account is required for this public fallback. The local model still writes the answer.
+  return wikipediaSearch(query, signal, sources);
+}
+
+async function wikipediaSearch(query, signal, sources) {
+  const searchTerms = query
+    .replace(/請先搜尋確認|請先搜尋|請搜尋|先搜尋|告訴我|請問|可以告訴我/g, " ")
+    .replace(/是不是|是否|為什麼|怎麼|如何|是誰|哪一個|哪一種|多少|嗎|呢|是|的|在|有|與|和|了/g, " ")
+    .replace(/[，。？！?！、；：]/g, " ").replace(/\s+/g, " ").trim();
+  const searchUrl = new URL("https://zh.wikipedia.org/w/api.php");
+  Object.entries({ action: "query", list: "search", srsearch: searchTerms || query, srlimit: "3", format: "json", utf8: "1" })
+    .forEach(([k, v]) => searchUrl.searchParams.set(k, v));
+  const searchRes = await fetch(searchUrl, { signal, headers: { "User-Agent": "W7LocalModelRelay/1.0" } });
+  if (!searchRes.ok) throw new Error(`維基百科搜尋回應 ${searchRes.status}`);
+  const hits = (await searchRes.json()).query?.search || [];
+  if (!hits.length) return JSON.stringify([]);
+  const pageIds = hits.map(h => h.pageid).join("|");
+  const pageUrl = new URL("https://zh.wikipedia.org/w/api.php");
+  Object.entries({ action: "query", pageids: pageIds, prop: "extracts", exintro: "1", explaintext: "1", format: "json", utf8: "1" })
+    .forEach(([k, v]) => pageUrl.searchParams.set(k, v));
+  const pageRes = await fetch(pageUrl, { signal, headers: { "User-Agent": "W7LocalModelRelay/1.0" } });
+  if (!pageRes.ok) throw new Error(`維基百科文章回應 ${pageRes.status}`);
+  const pages = (await pageRes.json()).query?.pages || {};
+  const rows = hits.map(h => {
+    const page = pages[h.pageid] || {};
+    const title = page.title || h.title;
+    return { title, url: `https://zh.wikipedia.org/wiki/${encodeURIComponent(title.replace(/ /g, "_"))}`, content: String(page.extract || h.snippet || "").slice(0, 1500) };
+  });
   rows.forEach(r => sources.push({ title: r.title, url: r.url }));
   return JSON.stringify(rows);
 }
